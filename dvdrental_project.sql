@@ -64,15 +64,41 @@ FROM film WHERE film_id IN(
 
 
 
----8. Which movies have been rented so far.
+---Which movies have been rented so far.
 
 SELECT COUNT(title)
 FROM film 
-WHERE film_id IN(
+WHERE film_id  IN(
+	
+	SELECT DISTINCT(film_id) 
+	FROM inventory AS I 
+	JOIN rental AS R 
+	ON I.inventory_id = R.inventory_id);
+	
+--Which movies have not been rented so far.
+
+SELECT COUNT(title)
+FROM film 
+WHERE film_id NOT IN(
 	
 	SELECT DISTINCT(film_id) 
 	FROM inventory AS I 
 	JOIN rental AS R 
 	ON I.inventory_id = R.inventory_id);
 
+--Which customers have not rented any movies so far.
 
+
+SELECT COUNT(DISTINCT(customer_id)) 
+From customer
+WHERE customer_id  NOT IN(
+	SELECT customer_id
+    FROM rental
+);
+
+--Display each movie and the number of times it got rented.
+
+SELECT inventory.film_id, COUNT(inventory.film_id) FROM inventory
+JOIN rental ON inventory.inventory_id = rental.inventory_id
+GROUP BY inventory.film_id
+ORDER BY COUNT(inventory.film_id) DESC;

@@ -1,6 +1,239 @@
-/*
-Do we have actors in the actor table that share the full name and if yes display those shared names
-*/
+
+
+--Select the first_name and the last_name of each actor. This query should result in selecting 2 columns.
+
+SELECT first_name , last_name 
+FROM actor;
+
+-- Select the full name of the actor. This query should result in 1 column.
+SELECT first_name||' '||last_name AS Full_Name
+FROM actor;
+
+
+-- Select the actors that have names starting with a ‘D’.
+
+
+SELECT * 
+FROM actor 
+WHERE first_name LIKE 'D%' OR first_name LIKE '%d';
+
+
+
+-- Select all the actor information sorted by the first name ascending.
+SELECT * FROM actor
+ORDER BY first_name;
+
+--Count the unique actor’s first names
+
+SELECT COUNT(DISTINCT(first_name))
+FROM actor;
+
+
+--Count the number of films based on their rental duration. rental_duaration in the film table referes to how long is the DVD allowed to be rented.
+SELECT  COUNT(title) ,rental_duration
+FROM film 
+GROUP BY rental_duration
+ORDER BY rental_duration;
+
+
+--Select the maximum replacement cost
+SELECT MAX(replacement_cost)
+FROM film;
+
+
+-- Select the titles of the movies that have the highest replacement cost.
+
+SELECT title, replacement_cost
+FROM film
+WHERE replacement_cost = (
+    SELECT MAX(replacement_cost)
+    FROM film
+);
+
+-- Select the unique different ratings for the movies in the film table.
+
+SELECT DISTINCT rating AS unique_rating
+FROM film;
+
+--Select the number of movies available under each rating.
+SELECT COUNT(*) AS number_of_movies , rating
+FROM film
+GROUP BY rating;
+
+
+-- Change the movie language for the first 20 movies from English language to Italian
+
+UPDATE film 
+SET language_id = (SELECT language_id FROM language WHERE name = 'Italian')
+WHERE film_id <=20;
+
+-- Select the count of movies grouped by language
+SELECT COUNT(*) , language_id 
+FROM film 
+GROUP BY language_id;
+
+--Select the language that most of the movies belong to.
+
+SELECT name 
+FROM language
+WHERE language_id = (SELECT language_id 
+FROM film
+GROUP BY language_id 
+ORDER BY (language_id) ASC LIMIT 1);
+
+---CTE APPROACH FOR THE SAME PROBLEM 
+
+WITH FirstLanguageID AS (
+    SELECT language_id
+    FROM film
+    GROUP BY language_id
+    ORDER BY language_id ASC
+    LIMIT 1
+)
+SELECT name
+FROM language
+WHERE language_id = (SELECT language_id FROM FirstLanguageID);
+
+
+--Select movie titles and replacement costs and ratings along with the average replacement cost for movies in the rating that the movie belongs to.
+
+SELECT title ,replacement_cost , rating ,
+ROUND(AVG(replacement_cost) OVER (PARTITION BY rating), 2 ) as average_replacement_cost
+FROM film 
+ORDER BY title;
+
+
+---2nd appraoch for the same problem 
+
+SELECT 
+    f.title, 
+    f.replacement_cost, 
+    f.rating,
+    avg_table.average_replacement_cost
+FROM 
+    film f
+JOIN 
+    (SELECT rating, ROUND(AVG(replacement_cost), 2) as average_replacement_cost
+     FROM film
+     GROUP BY rating) as avg_table
+ON 
+    f.rating = avg_table.rating
+ORDER BY 
+    f.title;
+
+--Display each movie and the number of times it got rented.
+
+SELECT inventory.film_id,COUNT(inventory.film_id)
+FROM 
+inventory 
+JOIN rental 
+ON inventory.inventory_id = rental.inventory_id 
+GROUP BY inventory.film_id
+ORDER BY inventory.film_id
+
+
+--Show the number of movies each actor acted in.
+SELECT 
+    DISTINCT(actor.first_name || ' ' || actor.last_name) AS name, 
+    COUNT(film_actor.film_id) AS film_count
+FROM 
+    actor
+JOIN 
+    film_actor ON actor.actor_id = film_actor.actor_id
+GROUP BY 
+    actor.actor_id, actor.first_name, actor.last_name
+ORDER BY 
+    name
+	
+--Display the names of the actors that acted in more than 20 movies.	
+	
+
+
+SELECT name , film_count
+FROM (SELECT 
+	  DISTINCT(actor.first_name || ' ' || actor.last_name) AS name, 
+	  COUNT(DISTINCT(film_actor.film_id)) AS film_count
+      FROM 
+      actor
+      JOIN 
+      film_actor ON actor.actor_id = film_actor.actor_id
+      GROUP BY 
+      actor.actor_id, actor.first_name, actor.last_name
+      ORDER BY 
+      name ASC)
+WHERE film_count >= 20 ;
+
+--How many actors have 8 letters only in their first_names.
+
+SELECT COUNT(*)
+FROM actor 
+WHERE CHAR_LENGTH(first_name)=8;
+
+
+
+
+
+--For all the movies rated “PG” show me the movie and the number of times it got rented.
+
+SELECT 
+    pg_films.film_id, 
+    pg_films.title, 
+    COUNT(rental.rental_id) AS rental_count
+FROM 
+    rental 
+JOIN 
+    (
+        SELECT 
+            film.film_id, 
+            film.title, 
+            film.rating, 
+            inventory.inventory_id  
+        FROM 
+            film 
+        JOIN 
+            inventory ON film.film_id = inventory.film_id
+        WHERE 
+            film.rating = 'PG'
+    ) AS pg_films ON pg_films.inventory_id = rental.inventory_id
+GROUP BY 
+    pg_films.film_id,
+    pg_films.title
+ORDER BY pg_films.film_id;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 SELECT COUNT(DISTINCT(first_name || last_name)) AS FUll_NAME

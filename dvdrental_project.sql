@@ -203,25 +203,96 @@ ORDER BY pg_films.film_id;
 
 
 
+--Display the movies offered for rent in store_id 1 and not offered in store_id 2
+
+SELECT DISTINCT f.film_id, f.title
+FROM film f
+JOIN inventory i1 ON f.film_id = i1.film_id
+LEFT JOIN inventory i2 ON f.film_id = i2.film_id AND i2.store_id = 2
+WHERE i1.store_id = 1 AND i2.inventory_id IS NULL
+ORDER BY f.film_id;
 
 
+---Display the movies offered for rent in any of the two stores 1 and 2.
+
+SELECT film_id 
+FROM inventory
+WHERE store_id =1 
+UNION 
+SELECT film_id 
+FROM inventory
+WHERE store_id = 2;
+
+-- Display the movie titles of those movies offered in both stores at the same time.
+
+SELECT f.film_id ,f.title 
+FROM film f 
+JOIN inventory i
+ON f.film_id = i.film_id
+WHERE i.store_id = 1
+INTERSECT
+SELECT f.film_id ,f.title 
+FROM film f 
+JOIN inventory i
+ON f.film_id = i.film_id
+WHERE i.store_id = 2
+
+---Alternative method
+SELECT DISTINCT f.film_id, f.title
+FROM film f
+JOIN inventory i1 ON f.film_id = i1.film_id
+JOIN inventory i2 ON f.film_id = i2.film_id
+WHERE i1.store_id = 1 AND i2.store_id = 2
+ORDER BY f.film_id;
 
 
+--- For each store, display the number of customers that are members of that store.
+SELECT store_id , COUNT(customer_id)
+FROM customer
+GROUP BY store_id
+
+-- Display the movie title for the most rented movie in the store with store_id 1
 
 
+(SELECT b.film_id, b.store_id, b.title , COUNT(b.rental_id) AS rental_count
+FROM (
+    SELECT f.film_id, f.title, i.inventory_id, r.rental_id, c.store_id
+    FROM film f
+    JOIN inventory i ON f.film_id = i.film_id
+    JOIN rental r ON i.inventory_id = r.inventory_id
+    JOIN customer c ON r.customer_id = c.customer_id
+) AS b
+WHERE b.store_id = 1
+GROUP BY b.film_id, b.store_id,b.title
+ORDER BY rental_count DESC LIMIT 1 );
+
+--- How many movies are not offered for rent in the stores yet. There are two stores only 1 and 2.
+
+SELECT 
+    (SELECT COUNT(*) FROM film) - 
+   
+    (SELECT COUNT(DISTINCT i.film_id)
+     FROM inventory i
+     WHERE i.store_id IN (1, 2)) AS films_not_offered_for_rent;
 
 
+--Display the customer_id’s for those customers that rented a movie DVD more than once
 
 
+SELECT rental_id , rental_date , customer_id , film_id 
+FROM rental JOIN inventory
+ON rental.inventory_id = inventory.inventory_id;
 
-
-
-
-
-
-
-
-
+WITH TEMP AS(
+    SELECT rental_id , rental_date , customer_id , film_id 
+	FROM rental JOIN inventory
+	ON rental.inventory_id = inventory.inventory_id )
+	
+SELECT T1.customer_id ,count(T1.film_id)
+FROM TEMP T1 join TEMP T2 
+ON T1.customer_id = T2.customer_id AND T1.film_id = T2.film_id AND T1.rental_date <> T2.rental_date
+GROUP BY T1.customer_id 
+HAVING count(T1.film_id)> 1 ;
 
 
 

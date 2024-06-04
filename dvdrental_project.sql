@@ -121,16 +121,203 @@ ON
 ORDER BY 
     f.title;
 
---Display each movie and the number of times it got rented.
 
-SELECT inventory.film_id,COUNT(inventory.film_id)
+
+
+---Select the ratings and average replacement cost for Italian movies.
+
+SELECT  film.rating, ROUND(AVG(film.replacement_cost),2) AS average_replacement_cost
+FROM film
+JOIN language ON film.language_id = language.language_id
+WHERE language.name = 'Italian'
+GROUP BY film.rating;
+
+---Count the movies that has the maximum replacement_cost in the film table.
+
+SELECT COUNT(film_id)
+FROM film
+WHERE replacement_cost = 
+
+(SELECT MAX(replacement_cost)
+FROM film)
+
+--Count the number of movies we have for each language in the film table. (Note we have movies that are in English and Italian languages only).
+
+
+SELECT language.name ,COUNT(*)
+FROM film 
+JOIN language
+ON film.language_id = language.language_id
+where language.name IN('English','Italian')
+GROUP BY  language.name ;
+
+
+
+---Count the number of movies exist under each of the 6 languages that exisit in the language table (English, Italian, French, Mandarine, Japanese and German).
+
+SELECT language.name, COALESCE(movie_count, 0) AS movie_count
+FROM language
+LEFT JOIN (
+    SELECT language_id, COUNT(*) AS movie_count
+    FROM film
+    GROUP BY language_id
+) AS film_counts ON language.language_id = film_counts.language_id
+WHERE language.name IN ('English', 'Italian', 'French', 'Mandarin', 'German', 'Japanese');
+
+
+--- Select the language_id, rating and count the number of movies under each language_id and rollup on language_id and rating then sort by the language id.
+
+SELECT
+    COALESCE(CAST(language_id AS TEXT), 'Total') AS language_id,
+    COALESCE(CAST(rating AS TEXT), 'Total') AS rating,
+    COUNT(*) AS count
+FROM film
+GROUP BY ROLLUP (language_id, rating)
+ORDER BY language_id, rating;
+
+-- Select movie titles, rental_rates along with a new column that has the rental rate discounted 20%
+SELECT title , rental_rate , ROUND(rental_rate *.80,2)  AS discounted_rental_rate 
+FROM film;
+
+
+
+--Select title, replacement_cost, rating, along with the maximum replacement cost under that rating.
+
+
+SELECT
+    f.title,
+    f.replacement_cost,
+    f.rating
+FROM
+    film f
+JOIN (
+    SELECT
+        rating,
+        MAX(replacement_cost) AS max_replacement_cost
+    FROM
+        film
+    GROUP BY
+        rating
+) AS sub
+ON f.rating = sub.rating AND f.replacement_cost = sub.max_replacement_cost
+ORDER BY
+    f.rating;
+
+
+
+
+/* What is a Window Function?
+A window function performs a calculation across a set of table rows that are 
+somehow related to the current row. Unlike aggregate functions, which return a single value 
+for a group of rows, a window function returns a value for each row in the table.
+*/
+
+/* Basic Syntax for window function 
+function_name(expression) OVER (
+    [PARTITION BY column_list]
+    [ORDER BY column_list]
+    [frame_clause]
+)
+*/
+
+/*
+Common Window Functions
+ROW_NUMBER(): Assigns a unique number to each row within the partition of a result set.
+RANK(): Assigns a rank to each row within the partition of a result set, with gaps in the ranking values.
+DENSE_RANK(): Similar to RANK(), but without gaps.
+SUM(): Calculates the sum of a set of values.
+AVG(): Calculates the average of a set of values.
+LEAD and LAG Functions
+LEAD(): Provides access to a subsequent row in the result set without the use of a self-join.
+LAG(): Provides access to a previous row in the result set without the use of a self-join.
+*/
+
+/*
+LEAD(expression, offset, default) OVER (
+    [PARTITION BY column_list]
+    [ORDER BY column_list]
+)
+
+LAG(expression, offset, default) OVER (
+    [PARTITION BY column_list]
+    [ORDER BY column_list]
+)
+*/
+
+---Group the rows in the film table into 4 buckets or 4 order groups.
+
+SELECT group_number,COUNT(*)
 FROM 
-inventory 
-JOIN rental 
-ON inventory.inventory_id = rental.inventory_id 
-GROUP BY inventory.film_id
-ORDER BY inventory.film_id
+(SELECT
+    title,
+    replacement_cost,
+    rating,
+    NTILE(4) OVER (
+		PARTITION BY rating 
+		ORDER BY replacement_cost 
+		DESC) AS group_number
+FROM
+    film) temp
+GROUP BY group_number
+ORDER BY 1 ;
 
+---Select for each movie it’s title, rental_rate and the rental_rate for the next two rows partitioned by the language_id.
+
+SELECT title , rental_rate ,
+LEAD(rental_rate ,2) OVER ( PARTITION BY language_id)
+FROM film;
+
+
+--Select for each movie it’s title, rental_rate and the rental_rate for the two previous rows partitioned by the language_id
+
+SELECT title , rental_rate ,
+LAG(rental_rate,2) OVER (PARTITION BY language_id)
+FROM film;
+
+
+--Show the rank by rating and order the results by rental_rate.
+SELECT title , language_id , rental_rate , rating,
+RANK() OVER (PARTITION BY rating ORDER BY rental_rate DESC)
+FROM film;
+
+
+--Show the percentage rank by rating and order the results by replacement_cost
+
+SELECT title , replacement_cost , rating,
+PERCENT_RANK() OVER (PARTITION BY rating ORDER BY replacement_cost DESC)
+FROM film;
+
+
+--Create “temp_table” table with the WITH statement that has all the movies with titles that start with a ‘b’ or ‘B’. Then select all information from the “temp_table
+WITH temp_table AS(
+SELECT title 
+FROM film
+WHERE title ILIKE 'B%'
+)
+SELECT * FROM temp_table;
+
+
+---Select all the movies excluding those under ‘PG-13’ or ‘G’ rating
+
+SELECT * FROM film 
+WHERE rating NOT IN ('PG-13','G');
+
+
+---Select the actors with actor_id from 1 to 20.
+
+SELECT * FROM actor 
+WHERE actor_id BETWEEN 1 AND 20;
+
+--Select language_ids and language names that have movies in the film table with those language_ids.
+SELECT
+    l.language_id,
+    l.name AS language_name
+FROM
+    language l
+INNER JOIN
+    film f ON l.language_id = f.language_id
+GROUP BY
+    l.language_id, l.name;
 
 --Show the number of movies each actor acted in.
 SELECT 
@@ -295,21 +482,6 @@ GROUP BY T1.customer_id
 HAVING count(T1.film_id)> 1 ;
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-SELECT COUNT(DISTINCT(first_name || last_name)) AS FUll_NAME
-FROM actor;
-
 -- identify duplicates 
 
 SELECT first_name || ' ' || last_name AS full_name, COUNT(*) 
@@ -406,3 +578,54 @@ SELECT inventory.film_id, COUNT(inventory.film_id) FROM inventory
 JOIN rental ON inventory.inventory_id = rental.inventory_id
 GROUP BY inventory.film_id
 ORDER BY COUNT(inventory.film_id) DESC;
+
+
+--identify the top 10 customers who have rented movies
+SELECT 
+     c.customer_id,
+     CONCAT(c.first_name , ' ' , c.last_name) AS customer_name,
+	 COUNT(r.rental_id) AS total_rents
+FROM customer AS c 
+JOIN rental r 
+ON c.customer_id = r.customer_id
+GROUP BY c.customer_id , customer_name
+ORDER BY total_rents DESC
+LIMIT 10;
+
+
+
+--identify the top 5 popular movies,
+
+SELECT f.film_id,f.title,COUNT(*)
+FROM film AS f
+JOIN inventory as i 
+ON f.film_id = i.film_id
+join rental AS r 
+on i.inventory_id = r.inventory_id
+GROUP BY f.film_id, f.title
+ORDER BY COUNT(*) DESC
+LIMIT 10;
+
+--What is the average number of rental per customer
+
+SELECT ROUND(COUNT(rental_id))/COUNT(DISTINCT customer_id) AS Average_num_of_rentals
+From rental 
+
+
+--which genres are most frequently rented
+
+SELECT ca.name, COUNT(r.rental_id)
+FROM film_category as fc 
+LEFT JOIN category as ca 
+ON fc.category_id = ca.category_id
+LEFT JOIN film AS f
+ON fc.film_id = f.film_id
+LEFT JOIN inventory AS i
+ON f.film_id = i.film_id
+LEFT JOIN rental AS r 
+ON i.inventory_id = r.inventory_id
+GROUP BY ca.name
+ORDER BY  COUNT(r.rental_id) DESC;
+
+
+

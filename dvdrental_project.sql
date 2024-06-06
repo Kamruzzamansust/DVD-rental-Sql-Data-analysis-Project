@@ -628,4 +628,152 @@ GROUP BY ca.name
 ORDER BY  COUNT(r.rental_id) DESC;
 
 
+-- identify peak and off-peak rental times
+
+SELECT 
+TO_CHAR(rental_date,'Day') AS day_of_week,
+EXTRACT(HOUR FROM rental_date) AS hour,
+COUNT(rental_id) AS rental_count
+FROM rental
+GROUP BY day_of_week ,hour
+ORDER BY day_of_week ;
+
+
+-- For each week day how many movies  rented 
+
+SELECT 
+  day_of_week,
+  SUM(rental_count) AS total_rentals
+FROM (
+  SELECT
+    TO_CHAR(rental_date, 'Day') AS day_of_week,
+    EXTRACT(HOUR FROM rental_date) AS hour,
+    COUNT(rental_id) AS rental_count
+  FROM rental
+  GROUP BY TO_CHAR(rental_date, 'Day'), EXTRACT(HOUR FROM rental_date)
+) AS daily_rentals
+GROUP BY day_of_week
+ORDER BY day_of_week;
+
+
+
+--order it by weekdays
+
+SELECT 
+  day_of_week,
+  SUM(rental_count) AS total_rentals
+FROM (
+  SELECT
+    TRIM(TO_CHAR(rental_date, 'Day')) AS day_of_week,
+    EXTRACT(HOUR FROM rental_date) AS hour,
+    COUNT(rental_id) AS rental_count
+  FROM rental
+  GROUP BY TRIM(TO_CHAR(rental_date, 'Day')), EXTRACT(HOUR FROM rental_date)
+) AS daily_rentals
+GROUP BY day_of_week
+ORDER BY 
+  CASE 
+    WHEN day_of_week = 'Sunday' THEN 1
+    WHEN day_of_week = 'Monday' THEN 2
+    WHEN day_of_week = 'Tuesday' THEN 3
+    WHEN day_of_week = 'Wednesday' THEN 4
+    WHEN day_of_week = 'Thursday' THEN 5
+    WHEN day_of_week = 'Friday' THEN 6
+    WHEN day_of_week = 'Saturday' THEN 7
+  END;
+
+
+--identify the customer who returns dvd late 
+
+
+WITH rental_status AS (
+  SELECT 
+    r.customer_id, 
+    r.rental_date, 
+    r.return_date,
+    f.rental_duration, 
+    (r.return_date - r.rental_date) AS date_difference,
+    CASE 
+      WHEN (r.return_date - r.rental_date) > (f.rental_duration * interval '1 day') THEN 'Late Return'
+      ELSE 'On Time'
+    END AS return_status
+  FROM rental AS r
+  JOIN customer AS c 
+    ON r.customer_id = c.customer_id
+  JOIN inventory AS i 
+    ON i.inventory_id = r.inventory_id
+  JOIN film AS f 
+    ON i.film_id = f.film_id
+)
+SELECT 
+  customer_id, 
+  COUNT(*) AS late_return_count
+FROM rental_status
+WHERE return_status = 'Late Return'
+GROUP BY customer_id
+ORDER BY late_return_count DESC;
+
+---identify the cuistomer who returns on time
+
+
+WITH rental_status AS (
+  SELECT 
+    r.customer_id, 
+    r.rental_date, 
+    r.return_date,
+    f.rental_duration, 
+    (r.return_date - r.rental_date) AS date_difference,
+    CASE 
+      WHEN (r.return_date - r.rental_date) > (f.rental_duration * interval '1 day') THEN 'Late Return'
+      ELSE 'On Time'
+    END AS return_status
+  FROM rental AS r
+  JOIN customer AS c 
+    ON r.customer_id = c.customer_id
+  JOIN inventory AS i 
+    ON i.inventory_id = r.inventory_id
+  JOIN film AS f 
+    ON i.film_id = f.film_id
+)
+SELECT 
+  customer_id, 
+  COUNT(*) AS total_return_count,
+  COUNT(CASE WHEN return_status = 'Late Return' THEN 1 END) AS late_return_count
+FROM rental_status
+GROUP BY customer_id
+ORDER BY late_return_count DESC;
+
+
+
+--How many rented films were returned late, early and on time
+
+WITH t1 AS (
+  SELECT *, 
+         (return_date - rental_date) AS date_difference
+  FROM rental
+),
+t2 AS (
+  SELECT 
+    f.rental_duration, 
+    t1.date_difference,
+    CASE 
+      WHEN f.rental_duration > EXTRACT(day FROM t1.date_difference) THEN 'Returned Early'
+      WHEN f.rental_duration = EXTRACT(day FROM t1.date_difference) THEN 'Returned On Time'
+      ELSE 'Returned Late'
+    END AS return_status
+  FROM film f 
+  JOIN inventory i USING(film_id)
+  JOIN t1 USING(inventory_id)
+)
+SELECT return_status, COUNT(*) AS total_no_of_films
+FROM t2
+GROUP BY return_status
+ORDER BY total_no_of_films DESC;
+
+
+
+
+
+
+
 
